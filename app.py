@@ -25,6 +25,7 @@ async def on_ready():
 
 async def main():
     await bot.load_extension("cogs.basic")
+    await bot.load_extension("cogs.embed_creator")
     await bot.start(TOKEN)
 
 if __name__ == "__main__":
