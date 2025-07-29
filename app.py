@@ -1,7 +1,7 @@
-import discord
-from discord import app_commands
-from discord.ext import commands
-from dotenv import load_dotenv
+import discord # type: ignore
+from discord import app_commands # type: ignore
+from discord.ext import commands # type: ignore
+from dotenv import load_dotenv # type: ignore
 import os
 
 # --- ENV VARIABLEN LADEN ---
