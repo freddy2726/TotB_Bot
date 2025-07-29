@@ -1,38 +1,31 @@
-import discord # type: ignore
-from discord import app_commands # type: ignore
-from discord.ext import commands # type: ignore
-from dotenv import load_dotenv # type: ignore
+import discord
+from discord.ext import commands
+from dotenv import load_dotenv
 import os
+import asyncio
 
-# --- ENV VARIABLEN LADEN ---
+# ENV laden
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 TEST_GUILD_ID = int(os.getenv("GUILD_ID"))
 
-# --- BOT SETUP ---
+# Bot Setup
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# --- SLASH COMMANDS ---
-@bot.tree.command(name="ping", description="Antwortet mit pong.")
-async def ping_command(interaction: discord.Interaction):
-    await interaction.response.send_message("pong")
-
-@bot.tree.command(name="hilfe", description="Antwortet mit Hilfetext.")
-async def help_command(interaction: discord.Interaction):
-    await interaction.response.send_message("Hilfetext")
-
-# --- BEIM STARTEN: COMMANDS NUR IN DER TEST-GUILD SYNCEN ---
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
-
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     try:
         guild = discord.Object(id=TEST_GUILD_ID)
-        synced = await bot.tree.sync(guild=guild)  # Nur in Test-Guild
+        synced = await bot.tree.sync(guild=guild)
         print(f"Synced {len(synced)} command(s) to guild {TEST_GUILD_ID}")
     except Exception as e:
         print(f"Slash command sync failed: {e}")
 
-# --- BOT STARTEN ---
-bot.run(TOKEN)
+async def main():
+    await bot.load_extension("cogs.basic")
+    await bot.start(TOKEN)
+
+if __name__ == "__main__":
+    asyncio.run(main())
