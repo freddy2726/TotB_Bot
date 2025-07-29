@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 import os
 
 # --- ENV VARIABLEN LADEN ---
-#test
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 TEST_GUILD_ID = int(os.getenv("GUILD_ID"))
