@@ -8,6 +8,7 @@ class EmbedCreator(commands.Cog):
         self.bot = bot
         self.guild = discord.Object(id=int(os.getenv("GUILD_ID")))
 
+    @app_commands.default_permissions(administrator=True)
     @app_commands.command(name="create_embed", description="Erstellt ein Embed in einem Channel.")
     @app_commands.describe(
         channel="Der Channel, in den das Embed gesendet werden soll",
@@ -27,6 +28,17 @@ class EmbedCreator(commands.Cog):
         image_url: str = None,
         thumbnail_url: str = None
     ):
+
+        # Admin-only guard
+
+        user = getattr(interaction, 'user', None) or getattr(interaction, 'author', None)
+
+        if not getattr(getattr(user, 'guild_permissions', None), 'administrator', False):
+
+            await interaction.response.send_message('❌ Nur Administratoren dürfen diesen Befehl verwenden.', ephemeral=True)
+
+            return
+
         try:
             color_value = int(color.replace("#", ""), 16)
         except ValueError:
