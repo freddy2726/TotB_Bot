@@ -11,6 +11,9 @@ TEST_GUILD_ID = int(os.getenv("GUILD_ID"))
 
 # Bot Setup
 intents = discord.Intents.default()
+intents.members = True
+intents.message_content = False
+intents.reactions = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 @bot.event
@@ -26,6 +29,7 @@ async def on_ready():
 async def main():
     await bot.load_extension("cogs.basic")
     await bot.load_extension("cogs.embed_creator")
+    await bot.load_extension("cogs.self_roles")
     await bot.start(TOKEN)
 
 if __name__ == "__main__":

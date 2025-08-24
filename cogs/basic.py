@@ -3,6 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 import os
 
+
+
 class Basic(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -16,11 +18,10 @@ class Basic(commands.Cog):
     @app_commands.command(name="hilfe", description="Zeigt eine Übersicht aller verfügbaren Funktionen.")
     async def hilfe(self, interaction: discord.Interaction):
         help_text = (
-            "Hier sind die verfügbaren Befehle:\n"
-            "• `/ping` – antwortet mit `pong` und zeigt, dass der Bot online ist.\n"
-            "• `/hilfe` – zeigt diese Hilfe an.\n"
-            "• `/create_embed` – erstellt ein benutzerdefiniertes Embed mit Titel, Beschreibung, "
-            "Farbe (HEX‑Code) und optionalen Bildern.\n"
+            "• `/selfroles_create` – erstellt ein Panel (nur Admins).\n"
+            "• `/selfroles_bind` – bindet Emoji→Rolle (nur Admins).\n"
+            "• `/selfroles_unbind` – entfernt Bindungen (nur Admins).\n"
+            "• `/selfroles_list` – zeigt aktuelle Bindungen (nur Admins).\n"
         )
         await interaction.response.send_message(help_text)
 
