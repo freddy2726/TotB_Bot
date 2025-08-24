@@ -363,7 +363,7 @@ class SelfRoles(commands.Cog):
                     pass
                 break
 
-    @commands.Cog.listener())
+    @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
         if payload.guild_id is None:
             return
