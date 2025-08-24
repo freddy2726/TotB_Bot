@@ -20,7 +20,7 @@ class Basic(commands.Cog):
             "• `/ping` – antwortet mit `pong` und zeigt, dass der Bot online ist.\n"
             "• `/hilfe` – zeigt diese Hilfe an.\n"
             "• `/create_embed` – erstellt ein benutzerdefiniertes Embed mit Titel, Beschreibung, "
-            "Farbe (HEX‑Code) und optionalen Bildern.\n (nur Admins).\n"
+            "Farbe (HEX‑Code) und optionalen Bildern.\n"
         )
         await interaction.response.send_message(help_text)
 
