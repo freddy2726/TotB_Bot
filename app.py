@@ -30,6 +30,7 @@ async def main():
     await bot.load_extension("cogs.basic")
     await bot.load_extension("cogs.embed_creator")
     await bot.load_extension("cogs.self_roles")
+    await bot.load_extension("cogs.welcome")
     await bot.start(TOKEN)
 
 if __name__ == "__main__":
