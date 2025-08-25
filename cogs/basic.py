@@ -18,11 +18,21 @@ class Basic(commands.Cog):
     @app_commands.command(name="hilfe", description="Zeigt eine Übersicht aller verfügbaren Funktionen.")
     async def hilfe(self, interaction: discord.Interaction):
         help_text = (
-            "• `/selfroles_create` – erstellt ein Panel (nur Admins).\n"
-            "• `/selfroles_bind` – bindet Emoji→Rolle (nur Admins).\n"
-            "• `/selfroles_unbind` – entfernt Bindungen (nur Admins).\n"
-            "• `/selfroles_list` – zeigt aktuelle Bindungen (nur Admins).\n"
-        )
+            "• `/ping` – prüft, ob der Bot online ist.\n"
+            "• `/hilfe` – zeigt diese Hilfe an.\n"
+            "\n"
+            "🔑 **Admin only:**\n"
+            "• `/create_embed` – erstellt ein Embed mit Titel, Farbe, Bild, Thumbnail.\n"
+            "• `/selfroles_create` – erstellt oder aktualisiert ein Panel.\n"
+            "• `/selfroles_bind` – bindet Emoji → Rolle.\n"
+            "• `/selfroles_unbind` – entfernt Bindungen.\n"
+            "• `/selfroles_list` – zeigt aktuelle Bindungen.\n"
+            "• `/selfroles_refresh` – aktualisiert Panel-Embed(s).\n"
+            "• `/selfroles_delete` – löscht einen Selector (Panel bleibt bestehen).\n"
+            "\n"
+            "👋 **Welcome System:**\n"
+            "Neue Mitglieder werden automatisch im Willkommens-Channel begrüßt.\n"
+            )
         await interaction.response.send_message(help_text)
 
     async def cog_load(self):
