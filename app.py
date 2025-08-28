@@ -29,6 +29,7 @@ async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     try:
         guild = discord.Object(id=TEST_GUILD_ID)
+        bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
         print(f"🔁 Synced {len(synced)} command(s) to guild {TEST_GUILD_ID}")
     except Exception as e:
