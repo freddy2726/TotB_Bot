@@ -48,19 +48,6 @@ class Profile:
     level: int
     last_msg_ts: float
 
-# -------------------- Admin-Check --------------------
-def _is_admin_or_manager(self, interaction: discord.Interaction) -> bool:
-    # Admin-Rolle oder Manage Guild
-    try:
-        if isinstance(interaction.user, discord.Member):
-            if interaction.user.guild_permissions.manage_guild:
-                return True
-            role = interaction.guild.get_role(ADMIN_ROLE_ID) if interaction.guild else None
-            if role and role in interaction.user.roles:
-                return True
-    except Exception:
-        pass
-    return False
 
 def xp_for_next_level(level: int) -> int:
     """XP von Level L zu L+1 (Mee6-ähnliche Kurve)."""
@@ -347,71 +334,6 @@ class Leveling(commands.Cog):
         if embed is None:
             return await ctx.send("Noch keine Daten für die Rangliste vorhanden.")
         await ctx.send(embed=embed)
-
-        # -------------------- /add_xp --------------------
-@app_commands.command(name="add_xp", description="(Admin) Verleiht einem Mitglied zusätzliche XP.")
-@app_commands.describe(mitglied="Mitglied, das XP erhalten soll", xp="Menge an XP (positiv)")
-async def add_xp_slash(self, interaction: discord.Interaction, mitglied: discord.Member, xp: int):
-    if not self._is_admin_or_manager(interaction):
-        return await interaction.response.send_message("⛔ Dafür fehlt dir die Berechtigung.", ephemeral=True)
-    if xp <= 0:
-        return await interaction.response.send_message("Bitte eine **positive** XP-Zahl angeben.", ephemeral=True)
-
-    # Level vor Vergabe merken, um Crossing-Logic zu erkennen
-    profile_before = await self.get_profile(mitglied.id)
-    old_level = profile_before.level
-
-    new_xp, new_level, leveled = await self.add_xp(mitglied.id, xp)
-
-    # Announce & Rewards wenn gelevelt
-    if leveled:
-        await self._announce_level_up(interaction.guild, mitglied, new_level)  # type: ignore
-        if old_level < 10 <= new_level:
-            await self._handle_level10_reward(interaction.guild, mitglied, new_level)  # type: ignore
-
-    need = xp_for_next_level(new_level)
-    await interaction.response.send_message(
-        f"✅ {mitglied.mention} hat **+{xp} XP** erhalten.\n"
-        f"Aktueller Stand: **Level {new_level}** — **{new_xp}/{need} XP**.",
-        ephemeral=True
-    )
-
-    # -------------------- /add_level --------------------
-@app_commands.command(name="add_level", description="(Admin) Erhöht das Level eines Mitglieds um N Stufen.")
-@app_commands.describe(mitglied="Mitglied, das Level erhalten soll", level="Anzahl Level (positiv)")
-async def add_level_slash(self, interaction: discord.Interaction, mitglied: discord.Member, level: int):
-    if not self._is_admin_or_manager(interaction):
-        return await interaction.response.send_message("⛔ Dafür fehlt dir die Berechtigung.", ephemeral=True)
-    if level <= 0:
-        return await interaction.response.send_message("Bitte eine **positive** Level-Zahl angeben.", ephemeral=True)
-
-    profile = await self.get_profile(mitglied.id)
-    old_level = profile.level
-    new_level = old_level + level
-    # XP innerhalb des Levels beibehalten (als 'progress im Level'); passt zur Kurve,
-    # denn xp_for_next_level wächst mit dem Level.
-    new_xp_in_level = profile.xp
-
-    # DB-Update
-    async with self.pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "UPDATE users SET level=%s, xp=%s WHERE user_id=%s",
-                (new_level, new_xp_in_level, mitglied.id)
-            )
-
-    # Announce & Rewards (nur einmal final announcen)
-    await self._announce_level_up(interaction.guild, mitglied, new_level)  # type: ignore
-    if old_level < 10 <= new_level:
-        await self._handle_level10_reward(interaction.guild, mitglied, new_level)  # type: ignore
-
-    need = xp_for_next_level(new_level)
-    await interaction.response.send_message(
-        f"✅ {mitglied.mention} wurde von **Level {old_level}** auf **Level {new_level}** gesetzt.\n"
-        f"Aktueller Stand: **{new_xp_in_level}/{need} XP**.",
-        ephemeral=True
-    )
-
 
     # -------------------- Interna --------------------
     async def _announce_level_up(self, guild: discord.Guild, member: discord.Member, new_level: int):
