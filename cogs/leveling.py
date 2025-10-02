@@ -20,8 +20,8 @@ LEVEL_ANNOUNCE_CHANNEL_ID = LEVEL_QUERY_CHANNEL_ID
 
 # ⬇️ NEU: Preise-Kanal + Admin-Rolle (eintragen)
 LEVEL_PRIZES_CHANNEL_ID = 1423388175073673246   # z.B. 345678901234567890
-ADMIN_ROLE_ID = 1397894964427493417           # z.B. 456789012345678901
-SEND_WINNER_DM = False                         # optional
+ADMIN_ROLE_ID = 1397894964427493417             # z.B. 456789012345678901
+SEND_WINNER_DM = False                          # optional
 
 # Voice-Channel, der KEINE Voice-XP vergeben soll
 EXCLUDED_VOICE_CHANNEL_ID = 1410703819947638855
@@ -286,7 +286,16 @@ class Leveling(commands.Cog):
         embed.set_footer(text="Nächste Aktualisierung morgen um 08:00")
         return embed
 
-    # -------------------- Befehle --------------------
+    # -------------------- Admin-Helper --------------------
+    def _is_admin_or_manager(self, interaction: discord.Interaction) -> bool:
+        if not isinstance(interaction.user, discord.Member):
+            return False
+        if interaction.user.guild_permissions.manage_guild:
+            return True
+        role = interaction.guild.get_role(ADMIN_ROLE_ID) if interaction.guild else None
+        return bool(role and role in interaction.user.roles)
+
+    # -------------------- Befehle (Slash) --------------------
     @app_commands.command(name="level", description="Zeige dein aktuelles Level und den XP-Fortschritt.")
     async def level_slash(self, interaction: discord.Interaction, mitglied: Optional[discord.Member] = None):
         if interaction.channel_id != LEVEL_QUERY_CHANNEL_ID:
@@ -313,6 +322,73 @@ class Leveling(commands.Cog):
             return await interaction.response.send_message("Noch keine Daten für die Rangliste vorhanden.")
         await interaction.response.send_message(embed=embed)
 
+    # -------------------- Admin: /add_xp --------------------
+    @app_commands.command(name="add_xp", description="(Admin) Verleiht einem Mitglied zusätzliche XP.")
+    @app_commands.describe(
+        mitglied="Mitglied, das XP erhalten soll",
+        xp="Menge an XP (positiv)"
+    )
+    @app_commands.default_permissions(manage_guild=True)
+    async def add_xp_slash(self, interaction: discord.Interaction, mitglied: discord.Member, xp: int):
+        if not self._is_admin_or_manager(interaction):
+            return await interaction.response.send_message("⛔ Dafür fehlt dir die Berechtigung.", ephemeral=True)
+        if xp <= 0:
+            return await interaction.response.send_message("Bitte eine **positive** XP-Zahl angeben.", ephemeral=True)
+
+        before = await self.get_profile(mitglied.id)
+        old_level = before.level
+
+        new_xp, new_level, leveled = await self.add_xp(mitglied.id, xp)
+
+        if leveled:
+            await self._announce_level_up(interaction.guild, mitglied, new_level)  # type: ignore
+            if old_level < 10 <= new_level:
+                await self._handle_level10_reward(interaction.guild, mitglied, new_level)  # type: ignore
+
+        need = xp_for_next_level(new_level)
+        await interaction.response.send_message(
+            f"✅ {mitglied.mention} hat **+{xp} XP** erhalten.\n"
+            f"Aktueller Stand: **Level {new_level}** — **{new_xp}/{need} XP**.",
+            ephemeral=True
+        )
+
+    # -------------------- Admin: /add_level --------------------
+    @app_commands.command(name="add_level", description="(Admin) Erhöht das Level eines Mitglieds um N Stufen.")
+    @app_commands.describe(
+        mitglied="Mitglied, das Level erhalten soll",
+        level="Anzahl Level (positiv)"
+    )
+    @app_commands.default_permissions(manage_guild=True)
+    async def add_level_slash(self, interaction: discord.Interaction, mitglied: discord.Member, level: int):
+        if not self._is_admin_or_manager(interaction):
+            return await interaction.response.send_message("⛔ Dafür fehlt dir die Berechtigung.", ephemeral=True)
+        if level <= 0:
+            return await interaction.response.send_message("Bitte eine **positive** Level-Zahl angeben.", ephemeral=True)
+
+        prof = await self.get_profile(mitglied.id)
+        old_level = prof.level
+        new_level = old_level + level
+        new_xp_in_level = prof.xp  # Fortschritt im Level beibehalten
+
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "UPDATE users SET level=%s, xp=%s WHERE user_id=%s",
+                    (new_level, new_xp_in_level, mitglied.id)
+                )
+
+        await self._announce_level_up(interaction.guild, mitglied, new_level)  # type: ignore
+        if old_level < 10 <= new_level:
+            await self._handle_level10_reward(interaction.guild, mitglied, new_level)  # type: ignore
+
+        need = xp_for_next_level(new_level)
+        await interaction.response.send_message(
+            f"✅ {mitglied.mention} wurde von **Level {old_level}** auf **Level {new_level}** gesetzt.\n"
+            f"Aktueller Stand: **{new_xp_in_level}/{need} XP**.",
+            ephemeral=True
+        )
+
+    # -------------------- Prefix-Spiegel (deaktiviert) --------------------
     @commands.hybrid_command(name="level", with_app_command=False)
     async def level_prefix(self, ctx: commands.Context, member: Optional[discord.Member] = None):
         if ctx.channel.id != LEVEL_QUERY_CHANNEL_ID:
