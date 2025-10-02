@@ -18,6 +18,11 @@ from discord.ext import commands, tasks
 LEVEL_QUERY_CHANNEL_ID = 1410717838855114793
 LEVEL_ANNOUNCE_CHANNEL_ID = LEVEL_QUERY_CHANNEL_ID
 
+# ⬇️ NEU: Preise-Kanal + Admin-Rolle (eintragen)
+LEVEL_PRIZES_CHANNEL_ID = 000000000000000000   # z.B. 345678901234567890
+ADMIN_ROLE_ID = 000000000000000000            # z.B. 456789012345678901
+SEND_WINNER_DM = True                         # optional
+
 # Voice-Channel, der KEINE Voice-XP vergeben soll
 EXCLUDED_VOICE_CHANNEL_ID = 1410703819947638855
 
@@ -79,6 +84,7 @@ class Leveling(commands.Cog):
         await self.bot.wait_until_ready()
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cur:
+                # Basistabelle
                 await cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS users (
@@ -89,6 +95,17 @@ class Leveling(commands.Cog):
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
                     """
                 )
+                # Level-10-Flag robust nachziehen (erst prüfen, dann alter)
+                try:
+                    await cur.execute("SELECT level10_rewarded FROM users LIMIT 1;")
+                except Exception:
+                    try:
+                        await cur.execute(
+                            "ALTER TABLE users ADD COLUMN level10_rewarded TINYINT(1) NOT NULL DEFAULT 0;"
+                        )
+                    except Exception:
+                        # Falls alter aus irgendeinem Grund nicht geht, fahren wir ohne Hard-Guarantee fort
+                        pass
 
     async def get_profile(self, user_id: int) -> Profile:
         async with self.pool.acquire() as conn:
@@ -143,6 +160,32 @@ class Leveling(commands.Cog):
         profiles.sort(key=lambda p: combined_score(p.level, p.xp), reverse=True)
         return profiles[:limit]
 
+    # ---- Reward-Helpers (Level 10) ----
+    async def _already_rewarded_level10(self, user_id: int) -> bool:
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                try:
+                    await cur.execute("SELECT level10_rewarded FROM users WHERE user_id=%s", (user_id,))
+                    row = await cur.fetchone()
+                    if not row:
+                        return False
+                    return bool(row[0])
+                except Exception:
+                    # Spalte fehlt -> als nicht rewarded behandeln
+                    return False
+
+    async def _mark_rewarded_level10(self, user_id: int) -> None:
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                try:
+                    await cur.execute(
+                        "UPDATE users SET level10_rewarded=1 WHERE user_id=%s",
+                        (user_id,)
+                    )
+                except Exception:
+                    # Spalte fehlt -> still weitermachen
+                    pass
+
     # -------------------- Events --------------------
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -154,11 +197,16 @@ class Leveling(commands.Cog):
             return
 
         amount = random.randint(MESSAGE_XP_MIN, MESSAGE_XP_MAX)
+        old_level = profile.level
         new_xp, new_level, leveled = await self.add_xp(message.author.id, amount)
         await self.update_last_message_ts(message.author.id, now)
 
         if leveled:
             await self._announce_level_up(message.guild, message.author, new_level)
+
+            # ⬇️ Sonderfall: Crossing Level 10
+            if old_level < 10 <= new_level:
+                await self._handle_level10_reward(message.guild, message.author, new_level)
 
     # -------------------- Voice-XP-Task --------------------
     @tasks.loop(seconds=VOICE_XP_TICK_SECONDS)
@@ -174,9 +222,15 @@ class Leveling(commands.Cog):
                     for member in vc.members:
                         if member.bot:
                             continue
+                        # Level vor XP-Änderung holen, damit wir "Crossing" erkennen
+                        profile = await self.get_profile(member.id)
+                        old_level = profile.level
+
                         _xp, level, leveled = await self.add_xp(member.id, VOICE_XP_PER_MINUTE)
                         if leveled:
                             await self._announce_level_up(guild, member, level)
+                            if old_level < 10 <= level:
+                                await self._handle_level10_reward(guild, member, level)
             except Exception as e:
                 print(f"[voice_xp_task] Fehler in Guild {guild.id}: {e}")
 
@@ -291,6 +345,59 @@ class Leveling(commands.Cog):
                 await channel.send(f"🎉 {member.mention} hat **Level {new_level}** erreicht! Weiter so!")
             except Exception:
                 pass
+
+    async def _handle_level10_reward(self, guild: discord.Guild, member: discord.Member, new_level: int):
+        # Doppelvergabe-Schutz
+        if await self._already_rewarded_level10(member.id):
+            return
+
+        # 1) Öffentliche Gewinn-Meldung im Level-Channel (schöner Embed)
+        level_ch = guild.get_channel(LEVEL_ANNOUNCE_CHANNEL_ID)
+        if isinstance(level_ch, discord.TextChannel):
+            try:
+                emb = discord.Embed(
+                    title="🎉 Level 10 erreicht – Friendslist Ticket!",
+                    description=(
+                        f"{member.mention}, du hast **Level 10** erreicht und dir damit "
+                        f"ein **Friendslist Ticket** für das **nächste TotB Event** gesichert! 🫶\n\n"
+                        f"Ein Admin meldet sich bald bei dir mit den Details."
+                    ),
+                    color=discord.Color.gold(),
+                )
+                emb.set_footer(text="Techno on The Block — Level Up Rewards")
+                await level_ch.send(embed=emb)
+            except Exception:
+                pass
+
+        # 2) Admin-Ping im #level-up-preise
+        prizes_ch = guild.get_channel(LEVEL_PRIZES_CHANNEL_ID)
+        admin_role = guild.get_role(ADMIN_ROLE_ID)
+        if isinstance(prizes_ch, discord.TextChannel) and isinstance(admin_role, discord.Role):
+            try:
+                await prizes_ch.send(
+                    content=(
+                        f"{admin_role.mention} — **Friendslist Ticket** fällig!\n"
+                        f"User: {member.mention}\n"
+                        f"Grund: Level 10 erreicht.\n"
+                        f"Bitte Ticket für das nächste Event eintragen und Rückmeldung geben. ✅"
+                    ),
+                    allowed_mentions=discord.AllowedMentions(roles=[admin_role]),
+                )
+            except Exception:
+                pass
+
+        # 3) Optionale DM an den Gewinner
+        if SEND_WINNER_DM:
+            try:
+                await member.send(
+                    "🎉 Glückwunsch! Du hast Level 10 erreicht und ein Friendslist Ticket "
+                    "für das nächste TotB Event gewonnen! Ein Admin meldet sich bald bei dir. 🫶"
+                )
+            except discord.Forbidden:
+                pass
+
+        # 4) Als rewarded markieren
+        await self._mark_rewarded_level10(member.id)
 
     def cog_unload(self):
         self.voice_xp_task.cancel()
