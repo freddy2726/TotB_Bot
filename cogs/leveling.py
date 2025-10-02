@@ -432,10 +432,11 @@ class Leveling(commands.Cog):
         if isinstance(level_ch, discord.TextChannel):
             try:
                 emb = discord.Embed(
-                    title="🎉 Level 10 erreicht – Friendslist Ticket!",
+                    title="🎉 Level 10 erreicht – Gästeliste & Friendslist!",
                     description=(
                         f"{member.mention}, du hast **Level 10** erreicht und dir damit "
-                        f"ein **Friendslist Ticket** für das **nächste TotB Event** gesichert! 🫶\n\n"
+                        f"**1× Gästeliste-Ticket** + **2× Friendslist-Tickets** für das "
+                        f"**nächste TotB Event** gesichert! 🫶\n\n"
                         f"Ein Admin meldet sich bald bei dir mit den Details."
                     ),
                     color=discord.Color.gold(),
@@ -452,10 +453,10 @@ class Leveling(commands.Cog):
             try:
                 await prizes_ch.send(
                     content=(
-                        f"{admin_role.mention} — **Friendslist Ticket** fällig!\n"
-                        f"User: {member.mention}\n"
-                        f"Grund: Level 10 erreicht.\n"
-                        f"Bitte Ticket für das nächste Event eintragen und Rückmeldung geben. ✅"
+                        f"{admin_role.mention} — **Reward fällig (Level 10)**!\n"
+                    f"User: {member.mention}\n"
+                    f"Preis: **1× Gästeliste-Ticket + 2× Friendslist-Tickets** für das nächste Event.\n"
+                    f"Bitte entsprechend eintragen und Rückmeldung geben. ✅"
                     ),
                     allowed_mentions=discord.AllowedMentions(roles=[admin_role]),
                 )
@@ -466,7 +467,8 @@ class Leveling(commands.Cog):
         if SEND_WINNER_DM:
             try:
                 await member.send(
-                    "🎉 Glückwunsch! Du hast Level 10 erreicht und ein Friendslist Ticket "
+                    "🎉 Glückwunsch! Du hast Level 10 erreicht und damit "
+                    "**1× Gästeliste-Ticket + 2× Friendslist-Tickets** "
                     "für das nächste TotB Event gewonnen! Ein Admin meldet sich bald bei dir. 🫶"
                 )
             except discord.Forbidden:
